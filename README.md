@@ -75,74 +75,66 @@ Django-Relacional/
 ---
 
 ## 3. Definición de Dependencias
-Crea un archivo `requirements.txt` para listar las dependencias de Python necesarias para tu aplicación.
+El archivo `requirements.txt` ya incluye las dependencias necesarias para tu aplicación:
 
-> **Puedes copiar todo este bloque y pegarlo directamente en tu archivo requirements.txt.**
+> **Este es el contenido actual del archivo requirements.txt en el proyecto:**
 ```txt
-Django
-psycopg[binary]  # Driver para PostgreSQL
+Django==3.2.24
+djongo==1.3.6
+sqlparse==0.2.4
+pymongo==3.12.3
+psycopg2-binary==2.9.9
 ```
 
 ---
 
-## 4. Creación del Dockerfile
-El `Dockerfile` define la imagen de Docker que contendrá tu aplicación. Aquí se detallan las etapas de construcción, instalación de dependencias y configuración del entorno.
+## 4. Creación del Dockerfile Existente
+El `Dockerfile` actual define la imagen de Docker que contiene tu aplicación. Utiliza Python 3.12 Alpine y está optimizado para el proyecto de venta de entradas.
 
-> **Puedes copiar todo este bloque y pegarlo directamente en tu archivo Dockerfile.**
+> **Este es el Dockerfile actual del proyecto:**
 ```dockerfile
-# Etapa de construcción
-FROM python:3.13-alpine AS base
-LABEL maintainer="Grupo 12 <grupo12@utn.edu.ar>"
+FROM python:3.12-alpine AS base
+LABEL maintainer="Grupo 12 <grupo12@gmail.com>"
 LABEL version="1.0"
-LABEL description="Django-Relacional"
+LABEL description="cloudset"
+
 RUN apk --no-cache add bash pango ttf-freefont py3-pip curl
 
-# Etapa de construcción
 FROM base AS builder
-# Instalación de dependencias de construcción
-RUN apk --no-cache add py3-pip py3-pillow py3-brotli py3-scipy py3-cffi \
-  linux-headers autoconf automake libtool gcc cmake python3-dev \
-  fortify-headers binutils libffi-dev wget openssl-dev libc-dev \
-  g++ make musl-dev pkgconf libpng-dev openblas-dev build-base \
-  font-noto terminus-font libffi
+RUN apk --no-cache add \
+    libpq-dev gcc musl-dev python3-dev postgresql-dev \
+    py3-pillow py3-brotli py3-scipy py3-cffi \
+    linux-headers autoconf automake libtool cmake \
+    fortify-headers binutils libffi-dev wget openssl-dev libc-dev \
+    g++ make musl-dev pkgconf libpng-dev openblas-dev build-base \
+    font-noto terminus-font libffi
 
-# Copia solo los archivos necesarios para instalar dependencias de Python
+WORKDIR /install
 COPY ./requirements.txt .
-
-# Instalación de dependencias de Python
 RUN pip install --upgrade pip \
-  && pip install --no-cache-dir -r requirements.txt \
-  && rm requirements.txt
+    && pip install --no-cache-dir -r requirements.txt
 
-# Etapa de producción
 FROM base
 RUN mkdir /code
 WORKDIR /code
-# Copia solo los archivos necesarios desde la etapa de construcción
-COPY ./requirements.txt .
-RUN pip install -r requirements.txt \
-  && rm requirements.txt
-COPY --chown=user:group --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages 
-ENV PATH /usr/local/lib/python3.13/site-packages:$PATH
-# Configuración adicional
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY . /code
 RUN ln -s /usr/share/zoneinfo/America/Cordoba /etc/localtime
 
-# Comando predeterminado
-CMD ["gunicorn", "--bind", ":8000", "--workers", "3", "VentaEntrada.wsgi"]
+CMD ["gunicorn", "--bind", ":8000", "--workers", "3", "app.wsgi"]
 ```
 
 ---
 
-## 5. Configuración de Variables de Entorno
-Crea un archivo `.env.db` para almacenar las variables de entorno necesarias para la conexión a la base de datos.
+## 5. Configuración de Variables de Entorno Existente
+El archivo `.env.db` ya está configurado con las variables de entorno necesarias para la conexión a la base de datos:
 
-> **Puedes copiar todo este bloque y pegarlo directamente en tu archivo .env.db.**
+> **Este es el contenido actual del archivo .env.db:**
 ```conf
-# .env.db
-DATABASE_ENGINE=django.db.backends.postgresql
+DATABASE_ENGINE=django.db.backends.postgresql_psycopg2
+POSTGRES_DB=postgres
 POSTGRES_HOST=db
 POSTGRES_PORT=5432
-POSTGRES_DB=postgres
 POSTGRES_USER=postgres
 PGUSER=${POSTGRES_USER}
 POSTGRES_PASSWORD=postgres
@@ -152,10 +144,10 @@ POSTGRES_INITDB_ARGS="--locale-provider=icu --icu-locale=es-AR --auth-local=trus
 
 ---
 
-## 6. Definición de Servicios con Docker Compose
-El archivo `docker-compose.yml` orquesta los servicios necesarios: base de datos, backend de Django y utilidades para generación y administración del proyecto.
+## 6. Definición de Servicios con Docker Compose Existente
+El archivo `docker-compose.yml` actual orquesta los servicios necesarios para el sistema de venta de entradas:
 
-> **Puedes copiar todo este bloque y pegarlo directamente en tu archivo docker-compose.yml.**
+> **Este es el docker-compose.yml actual del proyecto:**
 ```yml
 services:
   db:
@@ -165,7 +157,7 @@ services:
     environment:
       - POSTGRES_INITDB_ARGS=--auth-host=md5 --auth-local=trust
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready" ]
+      test: ["CMD-SHELL", "pg_isready"]
       interval: 10s
       timeout: 2s
       retries: 5
@@ -173,8 +165,10 @@ services:
       - postgres-db:/var/lib/postgresql/data
     networks:
       - net
+    ports:
+      - "6666:5432"
 
-  web:
+  backend:
     build: .
     command: runserver 0.0.0.0:8000
     entrypoint: python3 manage.py
@@ -195,7 +189,7 @@ services:
   generate:
     build: .
     user: root
-    command: /bin/sh -c 'mkdir src && django-admin startproject VentaEntrada src'
+    command: /bin/sh -c 'mkdir src && django-admin startproject app src'
     env_file:
       - .env.db
     depends_on:
@@ -226,947 +220,645 @@ volumes:
   postgres-db:
 ```
 
+**Nota Importante:** El servicio principal se llama `backend` en este proyecto, no `web`.
+
 ---
 
-## 7. Generación y Configuración de la Aplicación
+## 7. Configuración y Ejecución del Proyecto Existente
 
-### Generar la estructura base del proyecto y la app
+### El proyecto ya está configurado, para ejecutarlo sigue estos pasos:
 
-Hay que tener el archivo `LICENSE` para que la generación de la imagen no produzca un error.
 > **Puedes copiar todo este bloque y pegarlo directamente en tu terminal.**
 ```bash
-# Crear archivo LICENSE vacío
-touch LICENSE
+# 1. Construir e iniciar todos los servicios
+docker-compose up --build
 
-# Generar estructura del proyecto Django
-docker-compose run --rm generate
+# 2. En otra terminal, aplicar migraciones
+docker-compose exec backend python manage.py makemigrations
+docker-compose exec backend python manage.py migrate
 
-# Crear la aplicación 'app'
-docker-compose run --rm manage startapp app
+# 3. Crear superusuario
+docker-compose exec backend python manage.py createsuperuser
 
-# Cambiar permisos de archivos (Linux/Mac)
-# En Windows no es necesario este comando
-sudo chown $USER:$USER -R .
+# 4. Cargar datos iniciales
+docker-compose exec backend python manage.py loaddata initial_data
 ```
 
-### Configuración de `settings.py`
-Edita el archivo `settings.py` para agregar tu app y configurar la base de datos usando las variables de entorno.
+### Acceder a la aplicación
+```
+http://localhost:8000/
+```
 
-> **Puedes copiar todo este bloque y pegarlo al final directamente en tu archivo ./src/VentaEntrada/settings.py.**
-```python
-import os
+**Panel de Administración:**
+```
+http://localhost:8000/admin/
+```
 
-ALLOWED_HOSTS = [os.environ.get("ALLOWED_HOSTS", "*")]
-
-INSTALLED_APPS += [
-    'app',  # Agrega tu app aquí
-]
-
-# Configuración de la base de datos
-DATABASE_ENGINE = os.environ.get("DATABASE_ENGINE", "")
-POSTGRES_USER = os.getenv("POSTGRES_USER", "")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "")
-POSTGRES_DB = os.environ.get("POSTGRES_DB", "") or os.getenv("DB_NAME")
-POSTGRES_HOST = os.environ.get("POSTGRES_HOST", "") or os.getenv("DB_HOST")
-POSTGRES_PORT = os.environ.get("POSTGRES_PORT", "") or os.getenv("DB_PORT")
-
-DATABASES = {
-    "default": {
-        "ENGINE": DATABASE_ENGINE,
-        "NAME": POSTGRES_DB,
-        "USER": POSTGRES_USER,
-        "PASSWORD": POSTGRES_PASSWORD,
-        "HOST": POSTGRES_HOST,
-        "PORT": POSTGRES_PORT,
-    }
-}
-
-# Configuración de idioma y zona horaria
-LANGUAGE_CODE = 'es-ar'
-TIME_ZONE = 'America/Argentina/Cordoba'
-USE_I18N = True
-USE_TZ = True
+**Base de Datos PostgreSQL (puerto externo):**
+```
+Host: localhost
+Puerto: 6666
+Usuario: postgres
+Contraseña: postgres
+Base de Datos: postgres
 ```
 
 ---
 
-## 8. Primeros Pasos con Django
+## 8. Modelado Actual de la Aplicación
 
-### Migrar la base de datos
-> **Puedes copiar todo este bloque y pegarlo directamente en tu terminal.**
-```bash
-docker-compose run --rm manage migrate
-```
+### Sistema de Venta de Entradas
+El proyecto implementa un sistema completo para la venta de entradas a eventos con los siguientes modelos:
 
-### Crear un superusuario
-> **Puedes copiar todo este bloque y pegarlo directamente en tu terminal.**
-```bash
-docker-compose run --rm manage createsuperuser
-```
-
-### Iniciar la aplicación
-> **Puedes copiar todo este bloque y pegarlo directamente en tu terminal.**
-```bash
-docker-compose up -d web
-```
-Accede a la administración de Django en [http://localhost:8000/admin/](http://localhost:8000/admin/)
-
-### Ver logs de los contenedores
-> **Puedes copiar todo este bloque y pegarlo directamente en tu terminal.**
-```bash
-docker-compose logs -f
-```
-
----
-
-## 9. Modelado de la Aplicación
-
-### Ejemplo de `models.py`
-Incluye modelos bien documentados y estructurados para una gestión profesional de tus datos.
-
-> **Puedes copiar todo este bloque y pegarlo directamente en tu archivo ./src/app/models.py.**
+> **Este es el archivo ./src/app/models.py actual:**
 ```python
 from django.db import models
-from django.utils.translation import gettext_lazy as _
-from django.contrib.auth.models import User
 
-
-class NombreAbstract(models.Model):
-    nombre = models.CharField(
-        _('Nombre'),
-        help_text=_('Nombre descriptivo'),
-        max_length=200,
-        # unique=True,
-    )
-
-    def save(self, *args, **kwargs):
-        self.nombre = self.nombre.upper()
-        return super().save(*args, **kwargs)
-
-    def __str__(self) -> str:
-        return f'{self.nombre}'
-
-    class Meta:
-        abstract = True
-        ordering = ['nombre']
-
-
-class Localidad(NombreAbstract):
-    class Meta:
-        verbose_name = 'localidad'
-        verbose_name_plural = 'localidades'
-
-
-class Barrio(NombreAbstract):
-    class Meta:
-        verbose_name = 'barrio'
-        verbose_name_plural = 'barrios'
-
-
-class Provincia(NombreAbstract):
-    class Meta:
-        verbose_name = 'provincia'
-        verbose_name_plural = 'provincias'
-
-
-class Producto(NombreAbstract):
-    ganancia = models.DecimalField(
-        _('Ganancia'),
-        max_digits=15,
-        decimal_places=2,
-        help_text=_('Ganancia del producto, expresado en coeficiente.'),
-        default=0
-    )
-    es_relleno = models.BooleanField(
-        _('Es Relleno'),
-        help_text=_('Especifica si el producto contiene relleno.'),
-        default=False
-    )
-
-    @property
-    def precio(self):
-        total = 0
-        for ingrediente in self.ingredientes.all():
-            total += ingrediente.cantidad * ingrediente.ingrediente.costo
-        return round(total * self.ganancia, 2)
-
-    class Meta:
-        verbose_name = 'producto'
-        verbose_name_plural = 'productos'
-
-
-class Cliente(NombreAbstract):
-    numero_documento = models.BigIntegerField(
-        _('numero documento'),
-        help_text=_('numero de documento / CUIT'),
-        null=True
-    )
-    direccion = models.CharField(
-        _('dirección'),
-        help_text=_('dirección del cliente'),
-        max_length=200,
-        blank=True,
-        null=True
-    )
-    celular = models.BigIntegerField(
-        _('Celular'),
-        help_text=_(
-            'Número de celular con característica del/la administrador/a'),
-        blank=True,
-        null=True
-    )
-    telefono = models.BigIntegerField(
-        _('teléfono'),
-        help_text=_('teléfono fijo'),
-        blank=True,
-        null=True
-    )
-    email = models.EmailField(
-        _('email'),
-        help_text=_('email del cliente'),
-        null=True,
-        blank=True,
-    )
-    barrio = models.ForeignKey(
-        Barrio,
-        verbose_name=_('barrio'),
-        help_text=_('barrio donde reside '),
-        related_name='%(app_label)s_%(class)s_related',
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True
-    )
-    localidad = models.ForeignKey(
-        Localidad,
-        verbose_name=_('localidad'),
-        help_text=_('localidad donde reside el cliente'),
-        related_name='%(app_label)s_%(class)s_related',
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True
-    )
-    provincia = models.ForeignKey(
-        Provincia,
-        verbose_name=_('provincia'),
-        help_text=_('provincia donde reside'),
-        related_name='%(app_label)s_%(class)s_related',
-        on_delete=models.PROTECT,
-        blank=True,
-        null=True
-    )
-    user = models.ForeignKey(
-        User,
-        help_text=_('Usuario con el que se loguea al sistema'),
-        verbose_name='usuario',
-        related_name='%(app_label)s_%(class)s',
-        related_query_name='%(app_label)s_%(class)s',
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True
-    )
+class TipoDNI(models.Model):
+    nombre = models.CharField(max_length=50)
 
     def __str__(self):
-        return '{} {}'.format(self.nombre, self.numero_documento)
+        return self.nombre
 
-    class Meta:
-        indexes = [
-            models.Index(
-                fields=[
-                    'numero_documento',
-                    'user',
-                ],
-                name='%(app_label)s_%(class)s_unico'
-            ),
-        ]
+class Cliente(models.Model):
+    nombre = models.CharField(max_length=100)
+    apellido = models.CharField(max_length=100)
+    nro_dni = models.IntegerField()
+    tipo_dni = models.ForeignKey(TipoDNI, on_delete=models.CASCADE)
 
+    def __str__(self):
+        return f"{self.nombre} {self.apellido}"
+
+class MedioDePago(models.Model):
+    descripcion = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.descripcion
+
+class Evento(models.Model):
+    nombre = models.CharField(max_length=100)
+    descripcion = models.TextField()
+    fecha = models.DateField()
+    hora = models.TimeField()
+    capacidad = models.IntegerField()
+
+    def __str__(self):
+        return self.nombre
+
+class Entrada(models.Model):
+    descripcion = models.CharField(max_length=100)
+    precio = models.DecimalField(max_digits=10, decimal_places=2)
+    evento = models.ForeignKey(Evento, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.descripcion
 
 class Venta(models.Model):
-    fecha = models.DateField(
-        _('fecha'),
-        help_text=_('fecha de la venta')
-    )
-    cliente = models.ForeignKey(
-        Cliente,
-        verbose_name=_('cliente'),
-        help_text=_('cliente que realiza la compra'),
-        related_name='compras',
-        on_delete=models.PROTECT,
-        blank=False,
-        null=False
-    )
+    fecha = models.DateField()
+    hora = models.TimeField()
+    importe = models.DecimalField(max_digits=10, decimal_places=2)
+    medio_de_pago = models.ForeignKey(MedioDePago, on_delete=models.CASCADE)
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE)
 
     def __str__(self):
-        return '{} {}'.format(self.fecha, self.cliente.nombre)
+        return f"Venta {self.id} - {self.fecha}"
 
-    class Meta:
-        ordering = ['fecha']
-        verbose_name = 'venta'
-        verbose_name_plural = 'ventas'
+class DetalleDeVenta(models.Model):
+    descripcion = models.CharField(max_length=100)
+    cant_entradas = models.IntegerField()
+    importe_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    venta = models.ForeignKey(Venta, on_delete=models.CASCADE)
+    entrada = models.ForeignKey(Entrada, on_delete=models.CASCADE)
 
-
-class DetalleVenta(models.Model):
-    venta = models.ForeignKey(
-        Venta,
-        verbose_name=_('venta'),
-        help_text=_('detalle de la compra'),
-        related_name='detalle',
-        on_delete=models.PROTECT,
-        blank=False,
-        null=False
-    )
-    cantidad = models.DecimalField(
-        _('cantidad'),
-        max_digits=15,
-        decimal_places=2,
-        help_text=_('cantidad'),
-        blank=True,
-        null=True,
-        default=None
-    )
-    producto = models.ForeignKey(
-        Producto,
-        verbose_name=_('producto'),
-        help_text=_('producto'),
-        related_name='detalle',
-        on_delete=models.PROTECT,
-        blank=False,
-        null=False
-    )
-
-
-class UnidadMedida(NombreAbstract):
-    class Meta:
-        verbose_name = 'unidad de medida'
-        verbose_name_plural = 'unidades de medida'
-
-
-class Ingrediente(NombreAbstract):
-    costo = models.DecimalField(
-        _('Costo'),
-        max_digits=15,
-        decimal_places=2,
-        help_text=_('Costo del ingrediente expresado en pesos'),
-        default=0
-    )
-    unidad_medida = models.ForeignKey(
-        UnidadMedida,
-        related_name='ingredientes',
-        on_delete=models.PROTECT,
-        help_text=_('Unidad de medida del ingrediente'),
-        null=False,
-        blank=False,
-        default=1
-    )
-
-    class Meta:
-        verbose_name = _('Ingrediente')
-        verbose_name_plural = _('Ingredientes')
-
-
-class Receta(models.Model):
-    cantidad = models.DecimalField(
-        _('Cantidad'),
-        max_digits=15,
-        decimal_places=3,
-        help_text=_(
-            'Cantidad del ingrediente, expresado en su unidad de medida.'),
-        default=0
-    )
-    ingrediente = models.ForeignKey(
-        Ingrediente,
-        related_name='productos',
-        on_delete=models.PROTECT,
-        help_text=_('Ingrediente de la receta'),
-    )
-    producto = models.ForeignKey(
-        Producto,
-        related_name='ingredientes',
-        on_delete=models.PROTECT,
-        help_text=_('Producto de la receta'),
-    )
-
-    class Meta:
-        ordering = ['ingrediente']
-        verbose_name = _('Receta')
-        verbose_name_plural = _('Recetas')
+    def __str__(self):
+        return self.descripcion
 ```
 
 ---
 
-## 10. Administración de la Aplicación
+## 9. Administración Actual de la Aplicación
 
-### Ejemplo de `admin.py`
-Registra tus modelos para gestionarlos desde el panel de administración de Django.
+### Configuración del Admin Django
+El panel de administración ya está configurado para gestionar todos los modelos:
 
-> **Puedes copiar todo este bloque y pegarlo directamente en tu archivo ./src/app/admin.py.**
+> **Este es el archivo ./src/app/admin.py actual:**
 ```python
 from django.contrib import admin
-from app.models import *
+from .models import *
 
-# Register your models here.
-admin.site.register(UnidadMedida)
-admin.site.register(Ingrediente)
-admin.site.register(Barrio)
-admin.site.register(Localidad)
-admin.site.register(Provincia)
 admin.site.register(Cliente)
+admin.site.register(TipoDNI)
+admin.site.register(MedioDePago)
+admin.site.register(Evento)
+admin.site.register(Entrada)
+admin.site.register(Venta)
+admin.site.register(DetalleDeVenta)
+```
 
+### Mejoras Sugeridas para el Admin
+> **Puedes reemplazar el contenido de ./src/app/admin.py con esta versión mejorada:**
+```python
+from django.contrib import admin
+from .models import *
 
-class RecetaInline(admin.TabularInline):
-    model = Receta
-    extra = 0
-
-
-@admin.register(Producto)
-class ProductoAdmin(admin.ModelAdmin):
-    inlines = [
-        RecetaInline,
-    ]
-    list_display = (
-        'nombre',
-        'precio',
-        'es_relleno',
-    )
-    ordering = ['nombre']  # -nombre descendente, nombre ascendente
+@admin.register(TipoDNI)
+class TipoDNIAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
     search_fields = ['nombre']
-    list_filter = (
-        'es_relleno',
-        'nombre',
-    )
 
+@admin.register(Cliente)
+class ClienteAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'apellido', 'nro_dni', 'tipo_dni')
+    search_fields = ['nombre', 'apellido', 'nro_dni']
+    list_filter = ('tipo_dni',)
+    ordering = ['apellido', 'nombre']
 
-class DetalleVentaInline(admin.TabularInline):
-    model = DetalleVenta
+@admin.register(MedioDePago)
+class MedioDePagoAdmin(admin.ModelAdmin):
+    list_display = ('descripcion',)
+    search_fields = ['descripcion']
+
+@admin.register(Evento)
+class EventoAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'fecha', 'hora', 'capacidad')
+    search_fields = ['nombre', 'descripcion']
+    list_filter = ('fecha',)
+    date_hierarchy = 'fecha'
+    ordering = ['-fecha', 'hora']
+
+@admin.register(Entrada)
+class EntradaAdmin(admin.ModelAdmin):
+    list_display = ('descripcion', 'evento', 'precio')
+    search_fields = ['descripcion', 'evento__nombre']
+    list_filter = ('evento',)
+    ordering = ['evento', 'precio']
+
+class DetalleDeVentaInline(admin.TabularInline):
+    model = DetalleDeVenta
     extra = 0
-
+    fields = ('entrada', 'cant_entradas', 'importe_unitario', 'descripcion')
+    readonly_fields = ('importe_unitario',)
 
 @admin.register(Venta)
 class VentaAdmin(admin.ModelAdmin):
-    save_on_top = True
-    save_as = True
-    list_per_page = 20
+    list_display = ('id', 'fecha', 'hora', 'cliente', 'importe', 'medio_de_pago')
+    search_fields = ['cliente__nombre', 'cliente__apellido']
+    list_filter = ('fecha', 'medio_de_pago')
     date_hierarchy = 'fecha'
-    list_display = (
-        'fecha',
-        'cliente',
-    )
+    ordering = ['-fecha', '-hora']
+    inlines = [DetalleDeVentaInline]
 
-    list_filter = (
-        'cliente__nombre',
-        'fecha',
-    )
-
-    inlines = [
-        DetalleVentaInline
-    ]
+@admin.register(DetalleDeVenta)
+class DetalleDeVentaAdmin(admin.ModelAdmin):
+    list_display = ('venta', 'entrada', 'cant_entradas', 'importe_unitario')
+    search_fields = ['venta__id', 'entrada__descripcion']
+    list_filter = ('entrada__evento',)
 ```
 
 ---
 
-## 11. Migraciones y Carga de Datos Iniciales
+## 10. Datos Iniciales del Sistema
 
-### Realizar migraciones de la app nueva
-> **Puedes copiar todo este bloque y pegarlo directamente en tu terminal.**
-```bash
-docker-compose run --rm manage makemigrations
-docker-compose run --rm manage migrate
-```
+### Fixtures Existentes
+El proyecto ya incluye datos de ejemplo para comenzar a trabajar:
 
-Accede a la administración de Django en [http://localhost:8000/admin/](http://localhost:8000/admin/) donde ya se van a ver los cambios realizados en la app, pero todavía sin datos pre cargados.
-
-### Crear y cargar fixtures (datos iniciales)
-Crea la carpeta `./src/app/fixtures` dentro de tu app y agrega el archivo `initial_data.json` con los datos de ejemplo. Luego, carga los datos:
-
-> **Puedes copiar todo este bloque y pegarlo directamente en tu terminal para crear la carpeta.**
-```bash
-mkdir -p src/app/fixtures
-```
-
-> **Puedes copiar todo este bloque y pegarlo directamente en tu archivo ./src/app/fixtures/initial_data.json.**
+> **Ejemplo del contenido de ./src/app/fixtures/initial_data.json:**
 ```json
 [
-    {
-        "model": "app.unidadmedida",
-        "pk": 1,
-        "fields": {
-            "nombre": "KILO"
-        }
-    },
-    {
-        "model": "app.unidadmedida",
-        "pk": 2,
-        "fields": {
-            "nombre": "UNIDAD"
-        }
-    },
-    {
-        "model": "app.unidadmedida",
-        "pk": 3,
-        "fields": {
-            "nombre": "LITRO"
-        }
-    },
-    {
-        "model": "app.ingrediente",
-        "pk": 1,
-        "fields": {
-            "nombre": "HARINA",
-            "costo": "150.00",
-            "unidad_medida": 1
-        }
-    },
-    {
-        "model": "app.ingrediente",
-        "pk": 2,
-        "fields": {
-            "nombre": "SAL",
-            "costo": "80.00",
-            "unidad_medida": 1
-        }
-    },
-    {
-        "model": "app.ingrediente",
-        "pk": 3,
-        "fields": {
-            "nombre": "HUEVO",
-            "costo": "25.00",
-            "unidad_medida": 2
-        }
-    },
-    {
-        "model": "app.ingrediente",
-        "pk": 4,
-        "fields": {
-            "nombre": "JAMÓN",
-            "costo": "1200.00",
-            "unidad_medida": 1
-        }
-    },
-    {
-        "model": "app.ingrediente",
-        "pk": 5,
-        "fields": {
-            "nombre": "QUESO",
-            "costo": "800.00",
-            "unidad_medida": 1
-        }
-    },
-    {
-        "model": "app.ingrediente",
-        "pk": 6,
-        "fields": {
-            "nombre": "ESPINACA",
-            "costo": "200.00",
-            "unidad_medida": 1
-        }
-    },
-    {
-        "model": "app.producto",
-        "pk": 1,
-        "fields": {
-            "nombre": "TALLARIN",
-            "ganancia": "2.00",
-            "es_relleno": false
-        }
-    },
-    {
-        "model": "app.producto",
-        "pk": 2,
-        "fields": {
-            "nombre": "RAVIOLI ESPINACA",
-            "ganancia": "3.00",
-            "es_relleno": true
-        }
-    },
-    {
-        "model": "app.producto",
-        "pk": 3,
-        "fields": {
-            "nombre": "SORRENTINO JAMÓN Y QUESO",
-            "ganancia": "3.80",
-            "es_relleno": true
-        }
-    },
-    {
-        "model": "app.receta",
-        "pk": 1,
-        "fields": {
-            "cantidad": "0.90",
-            "ingrediente": 1,
-            "producto": 1
-        }
-    },
-    {
-        "model": "app.receta",
-        "pk": 2,
-        "fields": {
-            "cantidad": "0.05",
-            "ingrediente": 2,
-            "producto": 1
-        }
-    },
-    {
-        "model": "app.receta",
-        "pk": 3,
-        "fields": {
-            "cantidad": "4.00",
-            "ingrediente": 3,
-            "producto": 1
-        }
-    },
-    {
-        "model": "app.receta",
-        "pk": 4,
-        "fields": {
-            "cantidad": "0.60",
-            "ingrediente": 1,
-            "producto": 2
-        }
-    },
-    {
-        "model": "app.receta",
-        "pk": 5,
-        "fields": {
-            "cantidad": "4.00",
-            "ingrediente": 3,
-            "producto": 2
-        }
-    },
-    {
-        "model": "app.receta",
-        "pk": 6,
-        "fields": {
-            "cantidad": "0.30",
-            "ingrediente": 6,
-            "producto": 2
-        }
-    },
-    {
-        "model": "app.receta",
-        "pk": 7,
-        "fields": {
-            "cantidad": "0.60",
-            "ingrediente": 1,
-            "producto": 3
-        }
-    },
-    {
-        "model": "app.receta",
-        "pk": 8,
-        "fields": {
-            "cantidad": "4.00",
-            "ingrediente": 3,
-            "producto": 3
-        }
-    },
-    {
-        "model": "app.receta",
-        "pk": 9,
-        "fields": {
-            "cantidad": "0.15",
-            "ingrediente": 4,
-            "producto": 3
-        }
-    },
-    {
-        "model": "app.receta",
-        "pk": 10,
-        "fields": {
-            "cantidad": "0.15",
-            "ingrediente": 5,
-            "producto": 3
-        }
-    },
-    {
-        "model": "app.barrio",
-        "pk": 1,
-        "fields": {
-            "nombre": "CENTRO"
-        }
-    },
-    {
-        "model": "app.barrio",
-        "pk": 2,
-        "fields": {
-            "nombre": "LAMADRID"
-        }
-    },
-    {
-        "model": "app.barrio",
-        "pk": 3,
-        "fields": {
-            "nombre": "AMEGHINO"
-        }
-    },
-    {
-        "model": "app.localidad",
-        "pk": 1,
-        "fields": {
-            "nombre": "VILLA MARÍA"
-        }
-    },
-    {
-        "model": "app.localidad",
-        "pk": 2,
-        "fields": {
-            "nombre": "VILLA NUEVA"
-        }
-    },
-    {
-        "model": "app.provincia",
-        "pk": 1,
-        "fields": {
-            "nombre": "CÓRDOBA"
-        }
-    },
-    {
-        "model": "app.cliente",
-        "pk": 1,
-        "fields": {
-            "nombre": "JUAN PÉREZ",
-            "numero_documento": 12345678,
-            "direccion": "San Martín 123",
-            "celular": 3534567890,
-            "email": "juan.perez@email.com",
-            "barrio": 1,
-            "localidad": 1,
-            "provincia": 1
-        }
-    },
-    {
-        "model": "app.cliente",
-        "pk": 2,
-        "fields": {
-            "nombre": "MARÍA GONZÁLEZ",
-            "numero_documento": 87654321,
-            "direccion": "Belgrano 456",
-            "celular": 3534567891,
-            "email": "maria.gonzalez@email.com",
-            "barrio": 2,
-            "localidad": 1,
-            "provincia": 1
-        }
+  {
+    "model": "app.TipoDNI",
+    "pk": 1,
+    "fields": {
+      "nombre": "DNI"
     }
+  },
+  {
+    "model": "app.TipoDNI",
+    "pk": 2,
+    "fields": {
+      "nombre": "Pasaporte"
+    }
+  },
+  {
+    "model": "app.Cliente",
+    "pk": 1,
+    "fields": {
+      "nombre": "Juan",
+      "apellido": "Pérez",
+      "nro_dni": 12345678,
+      "tipo_dni": 1
+    }
+  },
+  // ... más datos de clientes, eventos, entradas, etc.
 ]
 ```
 
-> **Puedes copiar todo este bloque y pegarlo directamente en tu terminal para cargar los datos.**
+### Cargar los Datos Iniciales
+> **Puedes copiar este comando para cargar los datos:**
 ```bash
-docker-compose run --rm manage loaddata initial_data
+docker-compose exec backend python manage.py loaddata initial_data
 ```
 
 ---
 
 ## 12. Comandos Útiles
 
-## 12. Comandos Útiles
+## 11. Comandos Útiles para el Proyecto
 
-### Ver logs de los contenedores
-> **Puedes copiar todo este bloque y pegarlo directamente en tu terminal.**
+### Trabajar con el proyecto usando Docker Compose
+**Importante:** En este proyecto el servicio principal se llama `backend`, no `web`.
+
+> **Comandos principales para desarrollo:**
 ```bash
+# Iniciar todos los servicios
+docker-compose up -d
+
+# Ver logs en tiempo real
 docker-compose logs -f
-```
 
-### Detener y eliminar contenedores
-> **Puedes copiar todo este bloque y pegarlo directamente en tu terminal.**
-```bash
+# Ver logs solo del backend
+docker-compose logs -f backend
+
+# Ver logs solo de la base de datos
+docker-compose logs -f db
+
+# Detener todos los servicios
 docker-compose down
-```
 
-### Detener y eliminar contenedores con imágenes y contenedores sin uso
-> **Puedes copiar todo este bloque y pegarlo directamente en tu terminal.**
-```bash
-docker-compose down -v --remove-orphans --rmi all
-```
+# Detener y eliminar volúmenes (CUIDADO: elimina la base de datos)
+docker-compose down -v
 
-### Limpiar recursos de Docker
-> **Puedes copiar todo este bloque y pegarlo directamente en tu terminal.**
-```bash
-docker system prune -a
-```
+# Reconstruir las imágenes y reiniciar
+docker-compose up --build
 
-### Ejecutar comandos de Django
-> **Puedes copiar todo este bloque y pegarlo directamente en tu terminal.**
-```bash
-# Crear nuevas migraciones
-docker-compose run --rm manage makemigrations
-
-# Aplicar migraciones
-docker-compose run --rm manage migrate
+# Acceder al shell del contenedor backend
+docker-compose exec backend bash
 
 # Acceder al shell de Django
-docker-compose run --rm manage shell
+docker-compose exec backend python manage.py shell
 
-# Recopilar archivos estáticos
-docker-compose run --rm manage collectstatic
+# Crear migraciones
+docker-compose exec backend python manage.py makemigrations
+
+# Aplicar migraciones
+docker-compose exec backend python manage.py migrate
 
 # Crear superusuario
-docker-compose run --rm manage createsuperuser
+docker-compose exec backend python manage.py createsuperuser
 
-# Cargar fixtures
-docker-compose run --rm manage loaddata initial_data
+# Cargar datos iniciales
+docker-compose exec backend python manage.py loaddata initial_data
+
+# Ver estado de los contenedores
+docker-compose ps
+
+# Reiniciar un servicio específico
+docker-compose restart backend
+docker-compose restart db
 ```
 
-### Cambiar permisos de archivos (Linux/Mac)
-> **Puedes copiar todo este bloque y pegarlo directamente en tu terminal.**
+### Comandos de limpieza y mantenimiento
+> **Comandos para limpiar el entorno:**
 ```bash
-sudo chown $USER:$USER -R .
+# Limpiar contenedores, redes e imágenes no utilizadas
+docker system prune -f
+
+# Limpiar solo contenedores detenidos
+docker container prune -f
+
+# Limpiar solo imágenes no utilizadas
+docker image prune -f
+
+# Limpiar solo volúmenes no utilizados
+docker volume prune -f
+
+# Reiniciar completamente el proyecto
+docker-compose down -v --remove-orphans
+docker system prune -f
+docker-compose up --build
+```
+
+### Comandos específicos de Django
+> **Comandos para administrar la aplicación Django:**
+```bash
+# Verificar la configuración del proyecto
+docker-compose exec backend python manage.py check
+
+# Ver todas las migraciones disponibles
+docker-compose exec backend python manage.py showmigrations
+
+# Ver el SQL de una migración específica
+docker-compose exec backend python manage.py sqlmigrate app 0001
+
+# Revertir migraciones (CUIDADO)
+docker-compose exec backend python manage.py migrate app zero
+
+# Ejecutar tests
+docker-compose exec backend python manage.py test
+
+# Recopilar archivos estáticos
+docker-compose exec backend python manage.py collectstatic
+
+# Ver la versión de Django
+docker-compose exec backend python manage.py version
+
+# Abrir el shell de la base de datos
+docker-compose exec backend python manage.py dbshell
+
+# Crear un dump de la base de datos
+docker-compose exec db pg_dump -U postgres postgres > backup.sql
+
+# Restaurar un dump de la base de datos
+docker-compose exec db psql -U postgres postgres < backup.sql
 ```
 
 ---
 
-## 13. Funcionalidades del Sistema
+## 12. Funcionalidades del Sistema de Venta de Entradas
 
-### Gestión de Productos
-- **Sistema de Recetas**: Cada producto puede tener múltiples ingredientes con cantidades específicas
-- **Cálculo Automático de Precios**: El precio se calcula automáticamente basado en:
-  - Costo de ingredientes × cantidad utilizada
-  - Coeficiente de ganancia del producto
-- **Clasificación**: Los productos pueden ser marcados como "con relleno" o "sin relleno"
+### Gestión de Eventos
+- **Eventos Completos**: Nombre, descripción, fecha, hora y capacidad
+- **Control de Capacidad**: Limitación de entradas por evento
+- **Programación**: Gestión de fechas y horarios
+
+### Gestión de Entradas
+- **Tipos de Entrada**: Diferentes categorías por evento
+- **Precios Diferenciados**: Cada tipo de entrada tiene su precio
+- **Asociación a Eventos**: Las entradas están vinculadas a eventos específicos
 
 ### Gestión de Clientes
-- **Información Completa**: Datos personales, contacto y ubicación
-- **Ubicación Geográfica**: Provincia → Localidad → Barrio
-- **Integración con Usuarios**: Opción de vincular con usuarios del sistema
+- **Datos Personales**: Nombre, apellido y documentos
+- **Tipos de Documento**: DNI, Pasaporte, etc.
+- **Trazabilidad**: Historial de compras por cliente
 
 ### Sistema de Ventas
-- **Registro de Ventas**: Con fecha y cliente asociado
-- **Detalles de Venta**: Productos y cantidades vendidas
-- **Trazabilidad**: Seguimiento completo de las transacciones
+- **Registro de Ventas**: Fecha, hora e importe total
+- **Medios de Pago**: Efectivo, tarjeta, transferencia, etc.
+- **Detalles de Venta**: Cantidad de entradas y precios por tipo
+- **Control de Stock**: Seguimiento de entradas vendidas vs. capacidad
 
 ### Panel de Administración
 - **Interfaz Optimizada**: Formularios inline para gestión eficiente
-- **Filtros y Búsquedas**: Herramientas avanzadas de navegación
-- **Ordenamiento**: Listas organizadas alfabéticamente
-- **Paginación**: Manejo eficiente de grandes volúmenes de datos
+- **Filtros por Fecha**: Navegación por períodos
+- **Búsquedas Avanzadas**: Por cliente, evento, fecha
+- **Reportes**: Listados organizados por fecha y cliente
 
 ---
 
-## 14. Estructura de la Base de Datos
-
-El proyecto utiliza PostgreSQL con las siguientes características:
+## 13. Estructura de la Base de Datos del Sistema
 
 ### Modelos Principales
-- **NombreAbstract**: Clase base abstracta para modelos con nombre
-- **Localidad, Barrio, Provincia**: Jerarquía geográfica
-- **UnidadMedida**: Unidades para ingredientes (Kilo, Unidad, Litro)
-- **Ingrediente**: Ingredientes con costo y unidad de medida
-- **Producto**: Productos finales con ganancia y tipo
-- **Receta**: Relación entre productos e ingredientes
+- **TipoDNI**: Tipos de documentos (DNI, Pasaporte)
 - **Cliente**: Información completa de clientes
+- **MedioDePago**: Formas de pago disponibles
+- **Evento**: Eventos con programación y capacidad
+- **Entrada**: Tipos de entradas por evento con precios
 - **Venta**: Transacciones de venta
-- **DetalleVenta**: Detalles de cada venta
+- **DetalleDeVenta**: Detalles de cada venta con cantidades
 
-### Relaciones
-- **Producto ↔ Ingrediente**: Relación many-to-many a través de Receta
-- **Cliente → Ubicación**: ForeignKey a Provincia, Localidad, Barrio
-- **Venta → Cliente**: ForeignKey con protección
-- **DetalleVenta → Venta/Producto**: ForeignKey con protección
+### Relaciones del Sistema
+- **Cliente → TipoDNI**: Cada cliente tiene un tipo de documento
+- **Entrada → Evento**: Las entradas pertenecen a eventos específicos
+- **Venta → Cliente**: Cada venta está asociada a un cliente
+- **Venta → MedioDePago**: Cada venta tiene un medio de pago
+- **DetalleDeVenta → Venta**: Los detalles pertenecen a una venta
+- **DetalleDeVenta → Entrada**: Cada detalle especifica el tipo de entrada
 
-### Características Técnicas
-- **Índices Optimizados**: Para consultas frecuentes
-- **Validaciones**: A nivel de modelo y base de datos
-- **Eliminación Protegida**: PROTECT en relaciones críticas
-- **Eliminación en Cascada**: CASCADE donde es apropiado
-- **Valores Nulos Controlados**: SET_NULL para datos opcionales
+### Características del Modelo
+- **Integridad Referencial**: CASCADE para mantener consistencia
+- **Campos Obligatorios**: Validaciones a nivel de modelo
+- **Representación String**: Métodos `__str__` para interfaz amigable
+- **Escalabilidad**: Diseño preparado para crecimiento
 
 ---
 
-## 15. Desarrollo y Personalización
+## 14. Desarrollo y Personalización del Sistema
 
-### Extensión del Proyecto
-Puedes extender el proyecto agregando:
+### Extensión del Proyecto de Venta de Entradas
+Puedes extender el sistema actual agregando nuevas funcionalidades:
 
-#### Nuevos Modelos
-> **Ejemplo de nuevo modelo en ./src/app/models.py:**
+#### Nuevos Modelos Sugeridos
+> **Ejemplo de nuevos modelos en ./src/app/models.py:**
 ```python
-class Categoria(NombreAbstract):
-    descripcion = models.TextField(
-        _('Descripción'),
-        help_text=_('Descripción de la categoría'),
-        blank=True,
-        null=True
-    )
+class Categoria(models.Model):
+    nombre = models.CharField(max_length=100)
+    descripcion = models.TextField(blank=True)
     
-    class Meta:
-        verbose_name = 'categoría'
-        verbose_name_plural = 'categorías'
+    def __str__(self):
+        return self.nombre
+
+class Descuento(models.Model):
+    nombre = models.CharField(max_length=100)
+    porcentaje = models.DecimalField(max_digits=5, decimal_places=2)
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    activo = models.BooleanField(default=True)
+    
+    def __str__(self):
+        return f"{self.nombre} ({self.porcentaje}%)"
+
+class EstadoVenta(models.Model):
+    nombre = models.CharField(max_length=50)  # Pendiente, Confirmada, Cancelada
+    
+    def __str__(self):
+        return self.nombre
+
+# Agregar campos a modelos existentes
+# En el modelo Evento:
+# categoria = models.ForeignKey(Categoria, on_delete=models.SET_NULL, null=True)
+
+# En el modelo Venta:
+# estado = models.ForeignKey(EstadoVenta, on_delete=models.PROTECT, default=1)
+# descuento = models.ForeignKey(Descuento, on_delete=models.SET_NULL, null=True, blank=True)
 ```
 
-#### Configuración de Admin
-> **Ejemplo de configuración en ./src/app/admin.py:**
-```python
-@admin.register(Categoria)
-class CategoriaAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'descripcion')
-    search_fields = ['nombre']
-    ordering = ['nombre']
-```
-
-#### Vistas Personalizadas
-> **Ejemplo de vista en ./src/app/views.py:**
+#### Vistas Personalizadas para Reportes
+> **Ejemplo de vistas en ./src/app/views.py:**
 ```python
 from django.shortcuts import render
 from django.http import JsonResponse
-from .models import Producto
+from django.db.models import Sum, Count
+from .models import Venta, Evento, Cliente
+from datetime import datetime, timedelta
 
-def lista_productos(request):
-    productos = Producto.objects.all()
-    return render(request, 'app/productos.html', {'productos': productos})
+def dashboard(request):
+    """Dashboard con estadísticas de ventas"""
+    today = datetime.now().date()
+    last_month = today - timedelta(days=30)
+    
+    # Estadísticas básicas
+    total_ventas_mes = Venta.objects.filter(
+        fecha__gte=last_month
+    ).aggregate(
+        total=Sum('importe'),
+        cantidad=Count('id')
+    )
+    
+    # Eventos próximos
+    eventos_proximos = Evento.objects.filter(
+        fecha__gte=today
+    ).order_by('fecha')[:5]
+    
+    # Clientes más frecuentes
+    mejores_clientes = Cliente.objects.annotate(
+        total_compras=Count('venta')
+    ).order_by('-total_compras')[:10]
+    
+    context = {
+        'total_ventas_mes': total_ventas_mes,
+        'eventos_proximos': eventos_proximos,
+        'mejores_clientes': mejores_clientes,
+    }
+    
+    return render(request, 'app/dashboard.html', context)
 
-def precio_producto(request, producto_id):
+def ventas_por_evento(request, evento_id):
+    """API para obtener ventas por evento"""
     try:
-        producto = Producto.objects.get(id=producto_id)
-        return JsonResponse({'precio': producto.precio})
-    except Producto.DoesNotExist:
-        return JsonResponse({'error': 'Producto no encontrado'}, status=404)
+        evento = Evento.objects.get(id=evento_id)
+        ventas = Venta.objects.filter(
+            detalledeventa__entrada__evento=evento
+        ).aggregate(
+            total_vendido=Sum('importe'),
+            entradas_vendidas=Sum('detalledeventa__cant_entradas')
+        )
+        
+        return JsonResponse({
+            'evento': evento.nombre,
+            'total_vendido': float(ventas['total_vendido'] or 0),
+            'entradas_vendidas': ventas['entradas_vendidas'] or 0,
+            'capacidad': evento.capacidad,
+            'disponibles': evento.capacidad - (ventas['entradas_vendidas'] or 0)
+        })
+    
+    except Evento.DoesNotExist:
+        return JsonResponse({'error': 'Evento no encontrado'}, status=404)
 ```
 
-#### URLs Personalizadas
-> **Ejemplo de configuración en ./src/app/urls.py:**
+#### URLs para las Nuevas Vistas
+> **Crear archivo ./src/app/urls.py:**
 ```python
 from django.urls import path
 from . import views
 
+app_name = 'app'
+
 urlpatterns = [
-    path('productos/', views.lista_productos, name='lista_productos'),
-    path('producto/<int:producto_id>/precio/', views.precio_producto, name='precio_producto'),
+    path('', views.dashboard, name='dashboard'),
+    path('evento/<int:evento_id>/ventas/', views.ventas_por_evento, name='ventas_evento'),
 ]
 ```
 
-### Comandos de Desarrollo
-> **Comandos útiles para desarrollo:**
+> **Agregar en ./src/VentaEntrada/urls.py:**
+```python
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('app.urls')),
+]
+```
+
+### Comandos de Desarrollo Específicos
+> **Comandos útiles para el desarrollo del sistema:**
 ```bash
-# Crear migraciones para cambios específicos
-docker-compose run --rm manage makemigrations app
+# Crear migraciones después de agregar nuevos modelos
+docker-compose exec backend python manage.py makemigrations app
 
-# Ver SQL de las migraciones
-docker-compose run --rm manage sqlmigrate app 0001
+# Ver el SQL que se ejecutará
+docker-compose exec backend python manage.py sqlmigrate app 0002
 
-# Verificar problemas en el proyecto
-docker-compose run --rm manage check
-
-# Ejecutar tests
-docker-compose run --rm manage test
-
-# Abrir shell de Django
-docker-compose run --rm manage shell
-
-# Crear datos de prueba
-docker-compose run --rm manage shell -c "
+# Crear datos de prueba desde el shell
+docker-compose exec backend python manage.py shell -c "
 from app.models import *
-from django.contrib.auth.models import User
+from datetime import date, time
 
-# Crear datos de ejemplo
-provincia = Provincia.objects.create(nombre='Buenos Aires')
-localidad = Localidad.objects.create(nombre='La Plata')
-barrio = Barrio.objects.create(nombre='Centro')
+# Crear evento de prueba
+evento = Evento.objects.create(
+    nombre='Concierto Rock',
+    descripcion='Gran concierto de rock nacional',
+    fecha=date(2024, 12, 31),
+    hora=time(21, 0),
+    capacidad=500
+)
+
+# Crear entradas para el evento
+entrada_general = Entrada.objects.create(
+    descripcion='Entrada General',
+    precio=2500.00,
+    evento=evento
+)
+
+entrada_vip = Entrada.objects.create(
+    descripcion='Entrada VIP',
+    precio=5000.00,
+    evento=evento
+)
+
+print(f'Evento creado: {evento.nombre}')
+print(f'Entradas creadas: {entrada_general.descripcion}, {entrada_vip.descripcion}')
 "
+
+# Generar reporte de ventas
+docker-compose exec backend python manage.py shell -c "
+from app.models import *
+from django.db.models import Sum
+
+# Reporte de ventas por evento
+for evento in Evento.objects.all():
+    total_vendido = Venta.objects.filter(
+        detalledeventa__entrada__evento=evento
+    ).aggregate(total=Sum('importe'))['total'] or 0
+    
+    print(f'{evento.nombre}: \${total_vendido}')
+"
+```
+
+### Mejoras de Seguridad y Producción
+> **Configuraciones adicionales en ./src/VentaEntrada/settings.py:**
+```python
+# Agregar al final del archivo settings.py
+
+# Configuración de seguridad
+if not DEBUG:
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_REDIRECT_EXEMPT = []
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+# Configuración de logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': '/code/logs/django.log',
+        },
+    },
+    'root': {
+        'handlers': ['file'],
+    },
+}
+
+# Configuración de email (para notificaciones)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 ```
 
 ---
 
-## 16. Solución de Problemas Comunes
+## 15. Solución de Problemas Comunes
 
 ### Problemas de Conexión a la Base de Datos
 ```bash
@@ -1176,8 +868,36 @@ docker-compose ps
 # Ver logs de la base de datos
 docker-compose logs db
 
+# Ver logs del backend
+docker-compose logs backend
+
 # Reiniciar servicios
-docker-compose restart
+docker-compose restart db
+docker-compose restart backend
+
+# Verificar conectividad desde el backend
+docker-compose exec backend ping db
+```
+
+### Problemas con Migraciones
+```bash
+# Ver estado actual de las migraciones
+docker-compose exec backend python manage.py showmigrations
+
+# Ver migraciones pendientes
+docker-compose exec backend python manage.py showmigrations --plan
+
+# Aplicar migraciones específicas
+docker-compose exec backend python manage.py migrate app 0001
+
+# Ver SQL de una migración sin aplicarla
+docker-compose exec backend python manage.py sqlmigrate app 0001
+
+# Marcar una migración como aplicada (sin ejecutarla)
+docker-compose exec backend python manage.py migrate app 0001 --fake
+
+# Revertir todas las migraciones de una app
+docker-compose exec backend python manage.py migrate app zero
 ```
 
 ### Problemas de Permisos (Linux/Mac)
@@ -1186,53 +906,137 @@ docker-compose restart
 sudo chown -R $USER:$USER .
 
 # Dar permisos de escritura
-chmod -R 755 .
+chmod -R 755 src/
+
+# Ver permisos actuales
+ls -la
 ```
 
-### Problemas de Migraciones
+### Problemas con el Puerto 8000
 ```bash
-# Ver estado de las migraciones
-docker-compose run --rm manage showmigrations
+# Ver qué proceso está usando el puerto 8000
+netstat -tulpn | grep :8000
 
-# Aplicar migraciones específicas
-docker-compose run --rm manage migrate app 0001
+# En Windows:
+netstat -ano | findstr :8000
 
-# Revertir migraciones
-docker-compose run --rm manage migrate app zero
+# Matar el proceso que está usando el puerto
+sudo kill -9 <PID>
+
+# En Windows:
+taskkill /PID <PID> /F
+
+# Cambiar el puerto en docker-compose.yml
+# Modificar la línea: "8001:8000" en lugar de "8000:8000"
 ```
 
-### Limpiar y Reconstruir
+### Limpiar y Reconstruir el Proyecto
 ```bash
-# Limpiar completamente
-docker-compose down -v --remove-orphans --rmi all
-docker system prune -a
+# Parar todos los contenedores
+docker-compose down
+
+# Limpiar volúmenes (CUIDADO: elimina la base de datos)
+docker-compose down -v
+
+# Limpiar imágenes del proyecto
+docker-compose down --rmi all
+
+# Limpiar todo el sistema Docker
+docker system prune -a -f
 
 # Reconstruir desde cero
 docker-compose build --no-cache
 docker-compose up -d
+
+# Restaurar la base de datos
+docker-compose exec backend python manage.py migrate
+docker-compose exec backend python manage.py loaddata initial_data
+```
+
+### Problemas con las Dependencias
+```bash
+# Reconstruir la imagen Python
+docker-compose build --no-cache backend
+
+# Ver las dependencias instaladas
+docker-compose exec backend pip list
+
+# Instalar dependencia faltante
+docker-compose exec backend pip install <paquete>
+
+# Actualizar requirements.txt con nuevas dependencias
+docker-compose exec backend pip freeze > requirements.txt
+```
+
+### Problemas de Memoria o Performance
+```bash
+# Ver uso de recursos
+docker stats
+
+# Limitar memoria del contenedor (en docker-compose.yml)
+# Agregar bajo el servicio backend:
+# deploy:
+#   resources:
+#     limits:
+#       memory: 512M
+
+# Ver logs de errores específicos
+docker-compose logs --tail=50 backend | grep ERROR
+```
+
+### Backup y Restauración de la Base de Datos
+```bash
+# Crear backup de la base de datos
+docker-compose exec db pg_dump -U postgres -d postgres > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Restaurar desde backup
+docker-compose exec -T db psql -U postgres -d postgres < backup_20241201_120000.sql
+
+# Backup con compresión
+docker-compose exec db pg_dump -U postgres -d postgres | gzip > backup_$(date +%Y%m%d_%H%M%S).sql.gz
+
+# Restaurar backup comprimido
+gunzip -c backup_20241201_120000.sql.gz | docker-compose exec -T db psql -U postgres -d postgres
 ```
 
 ---
 
-## 17. Mejores Prácticas
+## 16. Mejores Prácticas para el Sistema
 
 ### Desarrollo
 - **Usar migraciones**: Nunca modifiques la base de datos directamente
-- **Validar modelos**: Usar `clean()` y `full_clean()` en los modelos
-- **Documentar código**: Usar docstrings y comentarios
-- **Manejo de errores**: Usar try/except apropiadamente
+- **Validar datos**: Implementar validaciones en los modelos
+- **Documentar cambios**: Usar docstrings y comentarios descriptivos
+- **Control de versiones**: Hacer commits frecuentes y descriptivos
+- **Testing**: Crear tests para funcionalidades críticas
 
-### Producción
-- **Variables de entorno**: Usar `.env` para configuraciones sensibles
-- **Logs**: Configurar logging apropiado
-- **Backup**: Hacer respaldos regulares de la base de datos
-- **Monitoreo**: Implementar monitoreo de salud de la aplicación
+### Base de Datos
+- **Backups regulares**: Automatizar respaldos diarios
+- **Índices apropiados**: Optimizar consultas frecuentes
+- **Constraints**: Usar restricciones de base de datos
+- **Normalización**: Mantener el diseño normalizado
+- **Monitoreo**: Supervisar el performance de consultas
 
 ### Seguridad
-- **DEBUG = False**: En producción
-- **SECRET_KEY**: Usar una clave secreta única y segura
-- **ALLOWED_HOSTS**: Configurar hosts permitidos
+- **Variables de entorno**: No hardcodear credenciales
+- **Validación de entrada**: Sanitizar todos los inputs
+- **Permisos**: Principio de menor privilegio
 - **HTTPS**: Usar conexiones seguras en producción
+- **Autenticación**: Implementar autenticación robusta
+
+### Performance
+- **Consultas eficientes**: Usar select_related y prefetch_related
+- **Cache**: Implementar cache para datos frecuentes
+- **Optimización de imágenes**: Comprimir assets estáticos
+- **CDN**: Usar CDN para archivos estáticos
+- **Monitoring**: Monitorear tiempos de respuesta
+
+### Producción
+- **Environment separados**: Dev, Staging, Production
+- **Logs**: Configurar logging estructurado
+- **Monitoreo**: Implementar alertas automáticas
+- **Escalabilidad**: Preparar para crecimiento
+- **Documentación**: Mantener documentación actualizada
 
 ---
 
