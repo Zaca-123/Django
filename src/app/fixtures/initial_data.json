@@ -1,0 +1,154 @@
+[
+  {
+    "model": "app.TipoDNI",
+    "pk": 1,
+    "fields": {
+      "nombre": "DNI"
+    }
+  },
+  {
+    "model": "app.TipoDNI",
+    "pk": 2,
+    "fields": {
+      "nombre": "Pasaporte"
+    }
+  },
+  {
+    "model": "app.Cliente",
+    "pk": 1,
+    "fields": {
+      "nombre": "Juan",
+      "apellido": "Pérez",
+      "nro_dni": 12345678,
+      "tipo_dni": 1
+    }
+  },
+  {
+    "model": "app.Cliente",
+    "pk": 2,
+    "fields": {
+      "nombre": "María",
+      "apellido": "Gómez",
+      "nro_dni": 98765432,
+      "tipo_dni": 2
+    }
+  },
+  {
+    "model": "app.MedioDePago",
+    "pk": 1,
+    "fields": {
+      "descripcion": "Efectivo"
+    }
+  },
+  {
+    "model": "app.MedioDePago",
+    "pk": 2,
+    "fields": {
+      "descripcion": "Tarjeta de Crédito"
+    }
+  },
+  {
+    "model": "app.Evento",
+    "pk": 1,
+    "fields": {
+      "nombre": "Concierto Rock",
+      "descripcion": "Show de bandas locales",
+      "fecha": "2025-07-10",
+      "hora": "21:00:00",
+      "capacidad": 500
+    }
+  },
+  {
+    "model": "app.Evento",
+    "pk": 2,
+    "fields": {
+      "nombre": "Obra de Teatro",
+      "descripcion": "Comedia dramática",
+      "fecha": "2025-07-15",
+      "hora": "20:30:00",
+      "capacidad": 300
+    }
+  },
+  {
+    "model": "app.Entrada",
+    "pk": 1,
+    "fields": {
+      "descripcion": "Entrada General",
+      "precio": "1500.00",
+      "evento": 1
+    }
+  },
+  {
+    "model": "app.Entrada",
+    "pk": 2,
+    "fields": {
+      "descripcion": "VIP",
+      "precio": "3000.00",
+      "evento": 1
+    }
+  },
+  {
+    "model": "app.Entrada",
+    "pk": 3,
+    "fields": {
+      "descripcion": "Entrada Platea",
+      "precio": "2000.00",
+      "evento": 2
+    }
+  },
+  {
+    "model": "app.Venta",
+    "pk": 1,
+    "fields": {
+      "fecha": "2025-06-24",
+      "hora": "14:30:00",
+      "importe": "6000.00",
+      "medio_de_pago": 2,
+      "cliente": 1
+    }
+  },
+  {
+    "model": "app.Venta",
+    "pk": 2,
+    "fields": {
+      "fecha": "2025-06-24",
+      "hora": "15:00:00",
+      "importe": "2000.00",
+      "medio_de_pago": 1,
+      "cliente": 2
+    }
+  },
+  {
+    "model": "app.DetalleDeVenta",
+    "pk": 1,
+    "fields": {
+      "descripcion": "2 entradas generales",
+      "cant_entradas": 2,
+      "importe_unitario": "1500.00",
+      "venta": 1,
+      "entrada": 1
+    }
+  },
+  {
+    "model": "app.DetalleDeVenta",
+    "pk": 2,
+    "fields": {
+      "descripcion": "1 entrada VIP",
+      "cant_entradas": 1,
+      "importe_unitario": "3000.00",
+      "venta": 1,
+      "entrada": 2
+    }
+  },
+  {
+    "model": "app.DetalleDeVenta",
+    "pk": 3,
+    "fields": {
+      "descripcion": "1 entrada platea",
+      "cant_entradas": 1,
+      "importe_unitario": "2000.00",
+      "venta": 2,
+      "entrada": 3
+    }
+  }
+]
