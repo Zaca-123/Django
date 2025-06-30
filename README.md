@@ -39,7 +39,7 @@ cd Django/
 
 ---
 
-## 2. Estructura del Proyecto
+## Estructura de Nuestro Proyecto
 El proyecto cuenta con la siguiente estructura:
 
 ```
