@@ -28,14 +28,13 @@ Este tutorial te guiará paso a paso en la creación y despliegue de una aplicac
 - [Cómo crear un entorno virtual en Python](https://docs.djangoproject.com/en/2.0/intro/contributing/)
 
 ---
-
-## 1. Clonar el Repositorio
-Clona este repositorio y navega al directorio del proyecto.
+## 1. Estructura del Proyecto
+Crea una carpeta para tu proyecto. En este ejemplo, la llamaremos Dijango.
 
 > **Puedes copiar todo este bloque y pegarlo directamente en tu terminal.**
 ```bash
-git clone https://github.com/Zaca-123/Django-Relacional.git
-cd Django-Relacional
+mkdir Dijango
+cd Django/
 ```
 
 ---
