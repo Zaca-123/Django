@@ -56,5 +56,7 @@ http://localhost:8000/admin/
 ````
 
 
-## 📚 Licencia
-Este proyecto fue desarrollado como actividad académica y no cuenta con una licencia específica.
+## 🤝 Créditos y Licencia
+
+- Mantenido por: Grupo 12
+- Basado en el repositorio: [fábrica de pastas](https://github.com/pindutn/fabrica_pastas/tree/main)
