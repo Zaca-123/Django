@@ -1,0 +1,36 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# Django stuff
+*.log
+*.pot
+*.pyc
+db.sqlite3
+media/
+staticfiles/
+
+# VSCode settings
+.vscode/
+
+# Docker
+*.pid
+docker-compose.override.yml
+
+# Local backups
+*.bak
+*.swp
+*~
+
+# MacOS & Linux
+.DS_Store
+.Trashes
+.idea/
+
