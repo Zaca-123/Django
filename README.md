@@ -60,4 +60,6 @@ http://localhost:8000/admin/
 
 - Mantenido por: Grupo 12
 - Basado en el repositorio: [fábrica de pastas](https://github.com/pindutn/fabrica_pastas/tree/main)
-- El código se entrega "tal cual", sin garantías. Si te es útil, considera dar feedback.
+> El código se entrega "tal cual", sin garantías. Si te es útil, considera dar feedback.
+
+---
