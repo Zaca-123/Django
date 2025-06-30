@@ -122,7 +122,6 @@ docker compose run --rm manage migrate_to_mongo
 ## 🤝 Créditos y Licencia
 
 - Mantenido por: Grupo 12
-- Basado en el repositorio: [fábrica de pastas](https://github.com/pindutn/fabrica_pastas/tree/main)
 
 > El código se entrega "tal cual", sin garantías. Si te es útil, considera dar feedback.
 
