@@ -54,15 +54,7 @@ docker-compose exec web python manage.py createsuperuser
 ````
 http://localhost:8000/admin/
 ````
-## 📂 Estructura del proyecto
-````
-Django-Relacional/
-├── src/                # Código fuente de Django
-├── venv/               # Entorno virtual (opcional)
-├── docker-compose.yml  # Configuración de contenedores
-├── Dockerfile          # Imagen personalizada de Django
-└── requirements.txt    # Dependencias de Python
-````
+
 
 ## 📚 Licencia
 Este proyecto fue desarrollado como actividad académica y no cuenta con una licencia específica.
