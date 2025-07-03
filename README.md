@@ -21,7 +21,7 @@ docker compose run --rm manage createsuperuser
 ````
 ## 4. Carga datos iniciales
 ````bash
-docker compose run --rm manage loaddata datos.json
+docker compose run --rm manage loaddata initial_data.json
 ````
 # 🔄 Migración a MongoDB 
 Este repositorio muestra cómo migrar tu proyecto Django para que utilice MongoDB como base de datos principal, usando Docker, djongo y las mejores prácticas para un entorno de desarrollo moderno.
